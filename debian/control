@@ -6,7 +6,7 @@ Standards-Version: 3.6.2.1
 
 Package: youam-utils
 Architecture: any
-Depends: ipcalc, ${shlibs:Depends}
+Depends: dstat, ipcalc, ${shlibs:Depends}
 Recommends: youam-utils-desktop
 Section: utils
 Priority: extra
