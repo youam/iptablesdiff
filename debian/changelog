@@ -1,3 +1,11 @@
+youam-utils (0.1-2) unstable; urgency=low
+
+  * add youam-utils-desktop package for workstation tools
+  * add 'apg' dependency to youam-utils-desktop
+  * add 'apt-file' dependency to youam-utils-desktop
+
+ -- Uli Martens <uli@youam.net>  Sat, 28 Nov 2009 16:29:40 +0100
+
 youam-utils (0.1-1) unstable; urgency=low
 
   * first package version

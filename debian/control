@@ -7,8 +7,17 @@ Standards-Version: 3.6.2.1
 Package: youam-utils
 Architecture: any
 Depends: ipcalc, ${shlibs:Depends}
+Recommends: youam-utils-desktop
 Section: utils
 Priority: extra
 Description: Miscellanious utilities compiled and/or written by youam
  Miscellanious utilities:
   - ip-ls -- show all ip-addresses in a given network
+
+Package: youam-utils-desktop
+Architecture: all
+Depends: apg, apt-file
+Section: utils
+Priority: extra
+Description: Miscellanious tools usefull on workstation systems
+  Right now, this is a dependency-package only
