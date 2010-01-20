@@ -1,3 +1,9 @@
+youam-utils (0.4) unstable; urgency=low
+
+  * add pairs command
+
+ -- Uli Martens <uli@youam.net>  Wed, 20 Jan 2010 11:53:35 +0100
+
 youam-utils (0.3) unstable; urgency=low
 
   * add sort-by-ip and sort-by-length commands

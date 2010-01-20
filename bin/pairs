@@ -1,0 +1,9 @@
+#!/bin/bash
+
+IFS="\n"
+while read a; do
+	if [ -n "$b" ]; then
+		echo "$b $a"
+	fi
+	b="$a"
+done
