@@ -1,4 +1,10 @@
-youam-utils (0.1-2) unstable; urgency=low
+youam-utils (0.3) unstable; urgency=low
+
+  * add sort-by-ip and sort-by-length commands
+
+ -- Uli Martens <uli@youam.net>  Sat, 28 Nov 2009 23:37:26 +0100
+
+youam-utils (0.2) unstable; urgency=low
 
   * add youam-utils-desktop package for workstation tools
   * add 'apg' dependency to youam-utils-desktop
@@ -7,7 +13,7 @@ youam-utils (0.1-2) unstable; urgency=low
 
  -- Uli Martens <uli@youam.net>  Sat, 28 Nov 2009 16:29:40 +0100
 
-youam-utils (0.1-1) unstable; urgency=low
+youam-utils (0.1) unstable; urgency=low
 
   * first package version
   * added: ip-ls
