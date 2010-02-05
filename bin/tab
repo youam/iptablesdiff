@@ -1,0 +1,46 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my $maxcol = -1;
+my $minsep = 1;
+
+my @csize;
+my @direction;
+
+while (scalar @ARGV) {
+	my $cmd=shift @ARGV;
+	if ( $cmd eq "-d" ) {
+		@direction = split //, shift @ARGV;
+		next;
+	}
+	if ( $cmd eq "-s" ) {
+		@csize = split /,/, shift @ARGV;
+		next;
+	}
+	if ( $cmd eq "-m" ) {
+		$maxcol = shift @ARGV;
+		next;
+	}
+	print STDERR "$0: unknown argument '$cmd'\n";
+	exit 1;
+}
+
+while (<>) {
+	chomp;
+	my @line = split /\s+/, $_, $maxcol ;
+	for ( 0 .. scalar @line -1 ) {
+		if ( not defined $csize[$_] ) {
+			$csize[$_] = length($line[$_]);
+		}
+		if ( $csize[$_] <= length($line[$_]) ) {
+			$csize[$_] = length($line[$_]);
+		}
+		my $dir = -1;
+		$dir = 1 if defined $direction[$_] and $direction[$_] eq "r";
+		printf "%*s", $dir*$csize[$_], $line[$_];
+		print " " x $minsep;
+	}
+	print "\n";
+}

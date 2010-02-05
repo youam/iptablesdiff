@@ -1,3 +1,10 @@
+youam-utils (0.5) unstable; urgency=low
+
+  * make youam-utils an arch:all package, not arch:any
+  * add tab command
+
+ -- Uli Martens <uli@youam.net>  Fri, 05 Feb 2010 06:47:51 +0100
+
 youam-utils (0.4) unstable; urgency=low
 
   * add pairs command
