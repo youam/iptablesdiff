@@ -5,8 +5,8 @@ Maintainer: Uli Martens <uli@youam.net>
 Standards-Version: 3.6.2.1
 
 Package: youam-utils
-Architecture: any
-Depends: dstat, ipcalc, ${shlibs:Depends}
+Architecture: all
+Depends: dstat, ipcalc, ${perl:Depends}
 Recommends: youam-utils-desktop
 Section: utils
 Priority: extra
