@@ -1,3 +1,9 @@
+youam-utils (0.6) unstable; urgency=low
+
+  * install dotfiles as example files in youam-utils
+
+ -- Uli Martens <uli@youam.net>  Mon, 08 Feb 2010 06:49:45 +0100
+
 youam-utils (0.5) unstable; urgency=low
 
   * make youam-utils an arch:all package, not arch:any
