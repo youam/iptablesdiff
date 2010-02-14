@@ -13,6 +13,10 @@ Priority: extra
 Description: Miscellanious utilities compiled and/or written by youam
  Miscellanious utilities:
   - ip-ls -- show all ip-addresses in a given network
+  - pairs -- return the last and current line of stdin
+  - sort-by-ip -- sort stdin by IP value
+  - sort-by-length -- sort by length of line
+  - tab -- like column -t, but line-buffered
 
 Package: youam-utils-desktop
 Architecture: all

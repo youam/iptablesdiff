@@ -1,8 +1,9 @@
 youam-utils (0.7) unstable; urgency=low
 
   * add dependency on moreutils
+  * fix long description of youam-utils package
 
- -- Uli Martens <uli@youam.net>  Sun, 14 Feb 2010 14:18:14 +0100
+ -- Uli Martens <uli@youam.net>  Sun, 14 Feb 2010 14:21:37 +0100
 
 youam-utils (0.6) unstable; urgency=low
 
