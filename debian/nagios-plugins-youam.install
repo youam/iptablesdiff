@@ -1,0 +1,2 @@
+nrpe_youam.cfg /etc/nagios/nrpe.d
+nagios/* /usr/lib/nagios/plugins

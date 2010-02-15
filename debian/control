@@ -25,3 +25,12 @@ Section: utils
 Priority: extra
 Description: Miscellanious tools usefull on workstation systems
   Right now, this is a dependency-package only
+
+Package: nagios-plugins-youam
+Architecture: all
+Depends: ${perl:Depends}
+Section: net
+Priority: extra
+Description: plugin pack for systems maintained by youam
+  Contains this plugins:
+    - apt-status-check
