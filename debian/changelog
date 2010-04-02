@@ -1,3 +1,8 @@
+youam-utils (0.9) unstable; urgency=low
+
+  * add alias file to dotfiles
+
+ -- Uli Martens <uli@youam.net>  Fri, 02 Apr 2010 22:27:15 +0200
 
 youam-utils (0.8) unstable; urgency=low
 
