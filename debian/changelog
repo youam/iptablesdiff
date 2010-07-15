@@ -1,3 +1,9 @@
+youam-utils (0.10) unstable; urgency=low
+
+  * add debhelper build-dependency...
+
+ -- Uli Martens <uli@youam.net>  Mon, 05 Apr 2010 19:09:15 +0200
+
 youam-utils (0.9) unstable; urgency=low
 
   * add alias file to dotfiles

@@ -3,6 +3,7 @@ Section: utils
 Priority: extra
 Maintainer: Uli Martens <uli@youam.net>
 Standards-Version: 3.6.2.1
+Build-Depends: debhelper (>= 7.0.50)
 
 Package: youam-utils
 Architecture: all
