@@ -56,33 +56,147 @@ PROMPT=$'%0(?..%{\033[31m%}%B%?%b:)%(!.%{\033[31m%}%B.%{\033[34m%}%B%n@)%m%b:%B%
 fpath+=(~/.zsh/functions)
 
 # this is taken from grml's zshrc
+# autoload wrapper - use this one instead of autoload directly
 function zrcautoload() {
-    emulate -L zsh
-    setopt extended_glob
-    local fdir ffile
-    local -i ffound
+	emulate -L zsh
+	setopt extended_glob
+	local fdir ffile
+	local -i ffound
 
-    ffile=$1
-    (( found = 0 )) 
-    for fdir in ${fpath} ; do 
-        [[ -e ${fdir}/${ffile} ]] && (( ffound = 1 )) 
-    done 
 
-    (( ffound == 0 )) && return 1
-    if [[ $ZSH_VERSION == 3.1.<6-> || $ZSH_VERSION == <4->* ]] ; then 
-        autoload -U ${ffile} || return 1
-    else 
-        autoload ${ffile} || return 1
-    fi
-    return 0
+	ffile=$1
+	(( found = 0 ))
+	for fdir in ${fpath} ; do
+		[[ -e ${fdir}/${ffile} ]] && (( ffound = 1 ))
+	done
+
+	(( ffound == 0 )) && return 1
+	if [[ $ZSH_VERSION == 3.1.<6-> || $ZSH_VERSION == <4->* ]] ; then
+		autoload -U ${ffile} || return 1
+	else
+		autoload ${ffile} || return 1
+	fi
+	return 0
+}
+
+# utility functions {{{
+# this function checks if a command exists and returns either true
+# or false. This avoids using 'which' and 'whence', which will
+# avoid problems with aliases for which on certain weird systems. :-)
+# Usage: check_com [-c|-g] word
+#   -c  only checks for external commands
+#   -g  does the usual tests and also checks for global aliases
+check_com() {
+	emulate -L zsh
+	local -i comonly gatoo
+
+	if [[ $1 == '-c' ]] ; then
+		(( comonly = 1 ))
+		shift
+	elif [[ $1 == '-g' ]] ; then
+		(( gatoo = 1 ))
+	else
+		(( comonly = 0 ))
+		(( gatoo = 0 ))
+	fi
+
+	if (( ${#argv} != 1 )) ; then
+		printf 'usage: check_com [-c] <command>\n' >&2
+		return 1
+	fi
+
+	if (( comonly > 0 )) ; then
+		[[ -n ${commands[$1]}  ]] && return 0
+		return 1
+	fi
+
+	if   [[ -n ${commands[$1]}    ]] \
+	  || [[ -n ${functions[$1]}   ]] \
+	  || [[ -n ${aliases[$1]}     ]] \
+	  || [[ -n ${reswords[(r)$1]} ]] ; then
+
+		return 0
+	fi
+
+	if (( gatoo > 0 )) && [[ -n ${galiases[$1]} ]] ; then
+		return 0
+	fi
+
+	return 1
+}
+
+# creates an alias and precedes the command with
+# sudo if $EUID is not zero.
+salias() {
+	emulate -L zsh
+	local only=0 ; local multi=0
+	while [[ $1 == -* ]] ; do
+		case $1 in
+			(-o) only=1 ;;
+			(-a) multi=1 ;;
+			(--) shift ; break ;;
+			(-h)
+				printf 'usage: salias [-h|-o|-a] <alias-expression>\n'
+				printf '  -h      shows this help text.\n'
+				printf '  -a      replace '\'' ; '\'' sequences with '\'' ; sudo '\''.\n'
+				printf '          be careful using this option.\n'
+				printf '  -o      only sets an alias if a preceding sudo would be needed.\n'
+				return 0
+				;;
+			(*) printf "unkown option: '%s'\n" "$1" ; return 1 ;;
+		esac
+		shift
+	done
+
+	if (( ${#argv} > 1 )) ; then
+		printf 'Too many arguments %s\n' "${#argv}"
+		return 1
+	fi
+
+	key="${1%%\=*}" ;  val="${1#*\=}"
+	if (( EUID == 0 )) && (( only == 0 )); then
+		alias -- "${key}=${val}"
+	elif (( EUID > 0 )) ; then
+		(( multi > 0 )) && val="${val// ; / ; sudo }"
+		alias -- "${key}=sudo ${val}"
+	fi
+
+	return 0
+}
+
+# Remove these functions again, they are of use only in these
+# setup files. This should be called at the end of .zshrc.
+xunfunction() {
+	emulate -L zsh
+	local -a funcs
+	funcs=(salias xcat xsource xunfunction zrcautoload)
+
+	for func in $funcs ; do
+		[[ -n ${functions[$func]} ]] \
+			&& unfunction $func
+	done
+	return 0
 }
 
 zrcautoload vcs_info || vcs_info() {return 1}
 
+if check_com -c vim ; then
+	export EDITOR=${EDITOR:-vim}
+else
+	export EDITOR=${EDITOR:-vi}
+fi
+
+export PAGER=${PAGER:-less}
+
+REPORTTIME=5       # report about cpu-/system-/user-time of command if running longer than 5 seconds
+
+# automatically remove duplicates from these arrays
+typeset -U path cdpath fpath manpath
+
 precmd_vcs_info() {
-   psvar=()
-   vcs_info
-   [[ -n $vcs_info_msg_0_ ]] && psvar[1]="$vcs_info_msg_0_"
+	psvar=()
+	vcs_info
+	[[ -n $vcs_info_msg_0_ ]] && psvar[1]="$vcs_info_msg_0_"
 }
 
 
@@ -142,6 +256,39 @@ setopt EXTENDED_GLOB
 # beep on error in zle
 setopt beep
 
+# press esc-m for inserting last typed word again (thanks to caphuso!)
+insert-last-typed-word() { zle insert-last-word -- 0 -1 };
+zle -N insert-last-typed-word;
+
+#k# Insert last typed word
+bindkey "\em" insert-last-typed-word
+
+
+# run command line as user root via sudo:
+sudo-command-line() {
+	[[ -z $BUFFER ]] && zle up-history
+	[[ $BUFFER != sudo\ * ]] && BUFFER="sudo $BUFFER"
+}
+zle -N sudo-command-line
+
+#k# Put the current command line into a \kbd{sudo} call
+bindkey "^Os" sudo-command-line
+
+### jump behind the first word on the cmdline.
+### useful to add options.
+function jump_after_first_word() {
+	local words
+	words=(${(z)BUFFER})
+
+	if (( ${#words} <= 1 )) ; then
+		CURSOR=${#BUFFER}
+	else
+		CURSOR=${#${words[1]}}
+	fi
+}
+zle -N jump_after_first_word
+
+bindkey '^x1' jump_after_first_word
 # notify background job changes at once, don't wait for prompt
 setopt notify
 
