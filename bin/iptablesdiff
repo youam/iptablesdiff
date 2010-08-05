@@ -1,0 +1,136 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use YAML::Syck;
+use Algorithm::Diff;
+
+sub parse_ruleset {
+	my $file = shift;
+
+	open my $FILE, '<', $file
+		or die "$0: can't open file $file: $!";
+
+	my $ruleset;
+	my $table;
+	while (<$FILE>) {
+		next if m/^#/;
+		next if m/^COMMIT/;
+		s/ *$//;
+		next if m/^$/;
+		s/ --source / -s /;
+		s/ --destination / -d /;
+		s/ --out-interface / -o /;
+		s/ --in-interface / -i /;
+		s/ --jump / -j /;
+		s/ --protocol / -p /;
+		s/ --match / -m /;
+		s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
+
+		s#-o ([a-z0-9]+) -d ([0-9./]+) #-d $2 -o $1 #;
+		s#-p (tcp|udp) --dport #-p $1 -m $1 --dport #;
+
+		if ( m/^\*([a-zA-Z0-9_-]+)$/ ) {
+			# this is a table
+			$ruleset->{$1} = {};
+			$table = $1;
+			next;
+		}
+		if ( m/^:([a-zA-Z0-9]+) (ACCEPT|DROP) \[[0-9]+:[0-9]+\]$/ ) {
+			my $chain = $1;
+			my $policy = $2;
+			$ruleset->{$table}->{$chain}->{policy}=$policy;
+			$ruleset->{$table}->{$chain}->{rules} = [];
+			next;
+		}
+		if ( m/^-A ([a-zA-Z0-9]+) (.*)$/ ) {
+			my $chain = $1;
+			my $rule  = $2;
+			push @{$ruleset->{$table}->{$chain}->{rules}}, $rule;
+			next;
+		}
+		print STDERR "ignored: $_";
+	}
+	return $ruleset;
+	close $FILE;
+}
+
+sub compare_chains {
+	my $table = shift;
+	my $chain = shift;
+	my $c1 = shift;
+	my $c2 = shift;
+
+
+	if ( $c1->{policy} ne $c2->{policy} ) {
+		print "; iptables -t $table -P $chain $c2->{policy}\n";
+	}
+	my $diff = Algorithm::Diff->new( $c1->{rules}, $c2->{rules} );
+	my $same=1;
+	while ( $diff->Next() ) {
+		if ( !$diff->Same() ) {
+			$same=0;
+			last;
+		}
+	}
+	$diff->Reset();
+	if ( $same ) {
+		#print "# rules are unchanged\n";
+	} else {
+		print "# rules diff for table $table, chain $chain\n";
+		while(  $diff->Next()  ) {
+			if ( $diff->Same() ) {
+				print "  $_\n" for $diff->Items(1);
+				next;
+			}
+			print "- $_\n"   for  $diff->Items(1);
+			print "+ $_\n"   for  $diff->Items(2);
+		}
+		$diff->Reset();
+		my $p = 1;
+		while(  $diff->Next()  ) {
+			if ( $diff->Same() ) {
+				$p += scalar $diff->Items(1);
+				next;
+			}
+			print "; iptables -t $table -D $chain $p # $_\n" for $diff->Items(1);
+			print "; iptables -t $table -I $chain ",$p++," $_\n" for $diff->Items(2);
+		}
+
+	}
+
+
+
+}
+
+sub compare_tables {
+	my $table = shift;
+	my $t1 = shift;
+	my $t2 = shift;
+
+	my %all_chains;
+	$all_chains{$_}++ for keys %{$t1};
+	$all_chains{$_}++ for keys %{$t2};
+
+	for my $chain ( sort keys %all_chains ) {
+		compare_chains( $table, $chain, $t1->{$chain}, $t2->{$chain} );
+	}
+}
+
+sub compare_rulesets {
+	my $r1 = shift;
+	my $r2 = shift;
+
+	my %all_tables;
+	$all_tables{$_}++ for keys %{$r1};
+	$all_tables{$_}++ for keys %{$r2};
+
+	for my $table ( sort keys %all_tables ) {
+		compare_tables( $table, $r1->{$table}, $r2->{$table} );
+	}
+}
+
+my $r1 = parse_ruleset( $ARGV[0] );
+my $r2 = parse_ruleset( $ARGV[1] );
+
+compare_rulesets( $r1, $r2 );

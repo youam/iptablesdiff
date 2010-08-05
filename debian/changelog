@@ -1,8 +1,9 @@
 youam-utils (0.11) unstable; urgency=low
 
   * copy stuff from grml's zshrc
+  * add iptablesdiff command
 
- -- Uli Martens <uli@youam.net>  Thu, 15 Jul 2010 21:05:59 +0200
+ -- Uli Martens <uli@youam.net>  Thu, 15 Jul 2010 21:06:47 +0200
 
 youam-utils (0.10) unstable; urgency=low
 

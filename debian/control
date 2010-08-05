@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 7.0.50)
 
 Package: youam-utils
 Architecture: all
-Depends: moreutils, dstat, ipcalc, ${perl:Depends}
+Depends: moreutils, dstat, ipcalc, libyaml-syck-perl, libalgorithm-diff-perl, ${perl:Depends}
 Recommends: youam-utils-desktop
 Section: utils
 Priority: extra
