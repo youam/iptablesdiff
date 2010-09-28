@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/perl
 
 # Copyright (c) 2010 Uli Martens <uli@youam.net>
 # All rights reserved.
@@ -24,10 +24,24 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-IFS="\n"
-while read a; do
-	if [ -n "$b" ]; then
-		echo "$b $a"
-	fi
-	b="$a"
-done
+
+use strict;
+use warnings;
+
+my %strings;
+while (<>) {
+	chomp;
+	next if /^$/;
+	if ( m/^([a-zA-Z0-9._+-]+)\s+(.*)$/ ) {
+		my $k = $1;
+		my $v = $2;
+		push @{$strings{$k}}, $v;
+	} else {
+		die "did not match: '$_'";
+	}
+}
+
+for my $k ( sort keys %strings ) {
+#	next if scalar @{$strings{$k}} == 1;
+	print $k," ", join( " ", sort @{$strings{$k}}),"\n";
+}

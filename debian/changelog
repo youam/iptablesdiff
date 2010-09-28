@@ -1,3 +1,16 @@
+youam-utils (0.12.1) unstable; urgency=low
+
+  * add copyright messages
+  * add thc command
+
+ -- Uli Martens <uli@youam.net>  Tue, 28 Sep 2010 13:41:34 +0200
+
+youam-utils (0.12) unstable; urgency=low
+
+  * split off source package nagios-plugins-youam
+
+ -- Uli Martens <uli@youam.net>  Thu, 05 Aug 2010 09:47:04 +0200
+
 youam-utils (0.11) unstable; urgency=low
 
   * copy stuff from grml's zshrc
