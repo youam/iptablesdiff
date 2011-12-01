@@ -1,28 +1,16 @@
-Source: youam-utils
+Source: iptablesdiff
 Section: utils
 Priority: extra
 Maintainer: Uli Martens <uli@youam.net>
 Standards-Version: 3.6.2.1
 Build-Depends: debhelper (>= 7.0.50)
 
-Package: youam-utils
+Package: iptablesdiff
 Architecture: all
-Depends: moreutils, dstat, ipcalc, libyaml-syck-perl, libalgorithm-diff-perl, ${perl:Depends}, tree, less
-Recommends: youam-utils-desktop
+Depends: libyaml-syck-perl, libalgorithm-diff-perl, ${perl:Depends}
 Section: utils
 Priority: extra
-Description: Miscellanious utilities compiled and/or written by youam
- Miscellanious utilities:
-  - ip-ls -- show all ip-addresses in a given network
-  - pairs -- return the last and current line of stdin
-  - sort-by-ip -- sort stdin by IP value
-  - sort-by-length -- sort by length of line
-  - tab -- like column -t, but line-buffered
-
-Package: youam-utils-desktop
-Architecture: all
-Depends: apg, apt-file
-Section: utils
-Priority: extra
-Description: Miscellanious tools usefull on workstation systems
-  Right now, this is a dependency-package only
+Description: compare two iptables-save rulesets
+ Small tool to compare two iptables-save rulesets and show the differences both
+ in a diff-like output and as the iptables commands to mangle ruleset 1 into
+ ruleset 2.
