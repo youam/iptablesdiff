@@ -46,6 +46,7 @@ sub parse_ruleset {
 		next if m/^COMMIT/;
 		s/ *$//;
 		next if m/^$/;
+
 		s/ --source / -s /;
 		s/ --destination / -d /;
 		s/ --out-interface / -o /;
@@ -79,8 +80,8 @@ sub parse_ruleset {
 		}
 		print STDERR "ignored: $_";
 	}
-	return $ruleset;
 	close $FILE;
+	return $ruleset;
 }
 
 sub compare_chains {
@@ -88,7 +89,6 @@ sub compare_chains {
 	my $chain = shift;
 	my $c1 = shift;
 	my $c2 = shift;
-
 
 	if ( $c1->{policy} ne $c2->{policy} ) {
 		print "; iptables -t $table -P $chain $c2->{policy}\n";
@@ -124,11 +124,7 @@ sub compare_chains {
 			print "; iptables -t $table -D $chain $p # $_\n" for $diff->Items(1);
 			print "; iptables -t $table -I $chain ",$p++," $_\n" for $diff->Items(2);
 		}
-
 	}
-
-
-
 }
 
 sub compare_tables {
