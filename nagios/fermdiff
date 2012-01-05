@@ -1,0 +1,12 @@
+#!/bin/bash
+
+o=$(/usr/sbin/ferm -nl /etc/ferm/ferm.conf | iptablesdiff <(sudo iptables-save) /dev/stdin)
+
+if [ -z "$o" ]; then
+	echo "OK: ferm rules are uptodate"
+	exit 0
+else
+	echo "CRITICAL: ferm rules are not uptodate"
+	echo "$o"
+	exit 2
+fi

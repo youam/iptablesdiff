@@ -1,3 +1,9 @@
+iptablesdiff (0.13.2) unstable; urgency=low
+
+  * add fermdiff nagios plugin
+
+ -- Uli Martens <uli@youam.net>  Thu, 05 Jan 2012 13:32:34 +0100
+
 iptablesdiff (0.13.1) unstable; urgency=low
 
   * normalize some more
