@@ -4,7 +4,7 @@
 # call as   $0  ruleset1 ruleset2
 # depends: libyaml-syck-perl libalgorithm-diff-perl
 
-# Copyright (c) 2010-2011 Uli Martens <uli@youam.net>
+# Copyright (c) 2010-2014 Uli Martens <uli@youam.net>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -33,48 +33,137 @@ use warnings;
 use YAML::Syck;
 use Algorithm::Diff;
 
+# this is a list of iptables rules which are omitted by iptables-save if
+# they're unchanged because they're probably not even loaded
+my $implicit_rules = q{
+*nat
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:PREROUTING ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+*filter
+:FORWARD ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+*mangle
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+};
+
+sub normalize_iptablesrule {
+	my $_ = shift;
+
+	# regex snippets
+	my $dev = '[a-z0-9_]+';
+	my $ip  = '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+';
+	my $net = $ip.'/[0-9]+';
+	my $port = '[0-9]+|[0-9]+:[0-9]+';
+
+	s/$/ /;
+
+	s/ --source / -s /;
+	s/ --destination / -d /;
+	s/ --out-interface / -o /;
+	s/ --in-interface / -i /;
+	s/ --jump / -j /;
+	s/ --protocol / -p /;
+	s/ --match / -m /g;
+	s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
+	s/ --destination-ports / --dports /;
+
+	s#-d ($ip) #-d $1/32 #;
+	s#-s ($ip) #-s $1/32 #;
+
+	s# --comment ([a-z0-9_-]+) # --comment "$1" #;
+
+	# FIXME this should be done for all services by looking up getent info
+	s/ --dport ssh / --dport 22 /;
+	s/ --dport smtp / --dport 25 /;
+	s/ --dport domain / --dport 53 /;
+	s/ --dport http / --dport 80 /;
+	s/ --dport pop3 / --dport 110 /;
+	s/ --dport imap2 / --dport 143 /;
+	s/ --dport https / --dport 443 /;
+	s/ --dport imaps / --dport 993 /;
+	s/ --dport pop3s / --dport 995 /;
+	s/ --dport nrpe / --dport 5666 /;
+
+	s# --limit ([0-9]+)/s # --limit $1/sec #;
+
+	# set default values where optional and omitted
+	s/ -j REJECT\s*$/ -j REJECT --reject-with icmp-port-unreachable/;
+
+	# this normalizes the wrong way, but it's better readable this way
+	s/ -m icmp --icmp-type 8 / --icmp-type echo-request /;
+
+	s# -p (tcp|udp|icmp)(( .*)?)-m \1 # -p $1$2 #;
+
+	# fixup misc order stuff
+	s# -j SNAT (.*) --to-source # $1 -j SNAT --to-source #;
+	s# -o ($dev) -d ($ip) # -d $2 -o $1 #;
+	s# -i ($dev) -s ($net) -d ($net) # -s $2 -d $3 -i $1 #;
+	s# -i ($dev)(( .*)?) -s ($net) # -s $4 -i $1$2 #;
+	s# -p (tcp|udp|icmp) --dport ($port)(( -s $net)?( -d $net)?) #$3 -p $1 --dport $2 #;
+	s# -i ($dev) -p (tcp|udp) -d ($net) # -d $3 -i $1 -p $2 #;
+	s# -p (tcp|udp|icmp) -s ($net) -d ($net) # -s $2 -d $3 -p $1 #;
+	s# -p (tcp|udp|icmp) -d ($net) # -d $2 -p $1 #;
+	s# -p (tcp|udp|icmp) -s ($net) -i ($dev) -o ($dev) # -s $2 -i $3 -o $4 -p $1 #;
+	s# -i ($dev) -o ($dev) -d ($net) # -d $3 -i $1 -o $2 #;
+
+	s# -o ($dev) -d ($net) # -d $2 -o $1 #;
+	s# -i ($dev) -d ($net) # -d $2 -i $1 #;
+	s# --dport ($port) --sport ($port) # --sport $2 --dport $1 #;
+	s# -p (tcp|udp|icmp) --dport ($port) -o ($dev) # -o $3 -p $1 --dport $2 #;
+	s# -d ($net) -p (tcp|udp) --dport ($port) -s ($net) # -s $4 -d $1 -p $2 --dport $3 #;
+
+
+	s# -p (tcp|udp) -s ($net) # -s $2 -p $1 #;
+
+	s#  +# #;
+	s# +$##;
+
+	return $_;
+}
+
 sub parse_ruleset {
 	my $file = shift;
 
+	my @rules;
+	push @rules, split( "\n", $implicit_rules );
+
 	open my $FILE, '<', $file
 		or die "$0: can't open file $file: $!";
+	push @rules, <$FILE>;
+	close $FILE;
 
 	my $ruleset;
 	my $table;
-	while (<$FILE>) {
+	for ( @rules ) {
+		chomp;
 		next if m/^#/;
 		next if m/^COMMIT/;
 		s/ *$//;
 		next if m/^$/;
 
-		s/ --source / -s /;
-		s/ --destination / -d /;
-		s/ --out-interface / -o /;
-		s/ --in-interface / -i /;
-		s/ --jump / -j /;
-		s/ --protocol / -p /;
-		s/ --match / -m /;
-		s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
-
-		s#-o ([a-z0-9]+) -d ([0-9./]+) #-d $2 -o $1 #;
-		s#-p (tcp|udp) --dport #-p $1 -m $1 --dport #;
-
-		s#-d ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) #-d $1/32 #;
+		$_ = normalize_iptablesrule( $_ );
 
 		if ( m/^\*([a-zA-Z0-9_-]+)$/ ) {
 			# this is a table
-			$ruleset->{$1} = {};
+			$ruleset->{$1} = {} unless defined $ruleset->{$1};
 			$table = $1;
 			next;
 		}
-		if ( m/^:([a-zA-Z0-9]+) (ACCEPT|DROP) \[[0-9]+:[0-9]+\]$/ ) {
+		if ( m/^:([a-zA-Z0-9_-]+) (ACCEPT|DROP|-) \[[0-9]+:[0-9]+\]$/ ) {
 			my $chain = $1;
 			my $policy = $2;
 			$ruleset->{$table}->{$chain}->{policy}=$policy;
 			$ruleset->{$table}->{$chain}->{rules} = [];
 			next;
 		}
-		if ( m/^-A ([a-zA-Z0-9]+) (.*)$/ ) {
+		if ( m/^-A ([a-zA-Z0-9_-]+) (.*)$/ ) {
 			my $chain = $1;
 			my $rule  = $2;
 			push @{$ruleset->{$table}->{$chain}->{rules}}, $rule;
@@ -82,7 +171,6 @@ sub parse_ruleset {
 		}
 		print STDERR "ignored: $_";
 	}
-	close $FILE;
 	return $ruleset;
 }
 
@@ -92,7 +180,13 @@ sub compare_chains {
 	my $c1 = shift;
 	my $c2 = shift;
 
-	if ( $c1->{policy} ne $c2->{policy} ) {
+	if ( defined $c1 and not defined $c2 ) {
+		print "; iptables -t $table -X $chain\n";
+		return;
+	} elsif ( not defined $c1 and defined $c2 ) {
+		print "; iptables -t $table -N $chain\n";
+		$c1->{rules} = [];
+	} elsif ( $c1->{policy} ne $c2->{policy} ) {
 		print "; iptables -t $table -P $chain $c2->{policy}\n";
 	}
 	my $diff = Algorithm::Diff->new( $c1->{rules}, $c2->{rules} );

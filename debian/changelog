@@ -1,3 +1,18 @@
+iptablesdiff (0.14) stable; urgency=low
+
+  * added more implicit default rules
+  * add even move normalizing rules
+  * extend chain name regex
+
+ -- Uli Martens <uli@youam.net>  Mon, 20 Jan 2014 09:19:46 +0100
+
+iptablesdiff (0.13.3) unstable; urgency=low
+
+  * add implicit default rules to ruleset to minimize diff
+  * add more normalizing rules
+
+ -- Uli Martens <uli@youam.net>  Wed, 11 Jan 2012 11:49:31 +0100
+
 iptablesdiff (0.13.2) unstable; urgency=low
 
   * add fermdiff nagios plugin
