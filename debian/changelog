@@ -1,3 +1,9 @@
+iptablesdiff (0.15) stable; urgency=medium
+
+  * normalize service names (static table for now)
+
+ -- Uli Martens <uli@youam.net>  Wed, 16 Apr 2014 12:44:07 +0200
+
 iptablesdiff (0.14) stable; urgency=low
 
   * added more implicit default rules

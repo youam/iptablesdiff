@@ -53,6 +53,36 @@ my $implicit_rules = q{
 :POSTROUTING ACCEPT [0:0]
 };
 
+sub canonicalize_service {
+	my $service = shift;
+
+	my $SERVICE = {
+		ssh => 22,
+		smtp => 25,
+		domain => 53,
+		http => 80,
+		pop3 =>  110,
+		ntp => 123,
+		imap2 => 143,
+		https => 443,
+		bgp => 179,
+		imaps => 993,
+		pop3s => 995,
+		nrpe => 5666,
+	};
+
+	return $SERVICE->{$service} if defined $SERVICE->{$service};
+
+	return $service;
+}
+sub canonicalize_services {
+	my $srv = shift;
+
+	my @srvs = sort { $a <=> $b } map { canonicalize_service( $_ ) } split /,/, $srv;
+
+	return join ( ",", @srvs );
+}
+
 sub normalize_iptablesrule {
 	my $_ = shift;
 
@@ -72,6 +102,7 @@ sub normalize_iptablesrule {
 	s/ --protocol / -p /;
 	s/ --match / -m /g;
 	s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
+	s/ -m state -p tcp / -p tcp -m state /;
 	s/ --destination-ports / --dports /;
 
 	s#-d ($ip) #-d $1/32 #;
@@ -80,16 +111,16 @@ sub normalize_iptablesrule {
 	s# --comment ([a-z0-9_-]+) # --comment "$1" #;
 
 	# FIXME this should be done for all services by looking up getent info
-	s/ --dport ssh / --dport 22 /;
-	s/ --dport smtp / --dport 25 /;
-	s/ --dport domain / --dport 53 /;
-	s/ --dport http / --dport 80 /;
-	s/ --dport pop3 / --dport 110 /;
-	s/ --dport imap2 / --dport 143 /;
-	s/ --dport https / --dport 443 /;
-	s/ --dport imaps / --dport 993 /;
-	s/ --dport pop3s / --dport 995 /;
-	s/ --dport nrpe / --dport 5666 /;
+	if ( m/ --dport ([a-zA-Z0-9]+) / ) {
+		my $o = $1;
+		my $r = canonicalize_service( $o );
+		s/ --dport $o / --dport $r /;
+	}
+	if ( m/ --dports ([a-zA-Z0-9,]+) / ) {
+		my $o = $1;
+		my $r = canonicalize_services( $o );
+		s/ --dports $o / --dports $r /;
+	}
 
 	s# --limit ([0-9]+)/s # --limit $1/sec #;
 
@@ -121,6 +152,10 @@ sub normalize_iptablesrule {
 
 
 	s# -p (tcp|udp) -s ($net) # -s $2 -p $1 #;
+    s# -p (tcp|udp) -m state # -m state -p $1 #;
+
+    s# -s 0/0 # #;
+    s# -d 0/0 # #;
 
 	s#  +# #;
 	s# +$##;
