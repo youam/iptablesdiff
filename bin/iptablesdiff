@@ -84,7 +84,7 @@ sub canonicalize_services {
 }
 
 sub normalize_iptablesrule {
-	my $_ = shift;
+	my $r = shift;
 
 	# regex snippets
 	my $dev = '[a-z0-9_]+';
@@ -92,75 +92,74 @@ sub normalize_iptablesrule {
 	my $net = $ip.'/[0-9]+';
 	my $port = '[0-9]+|[0-9]+:[0-9]+';
 
-	s/$/ /;
+	$r =~ s/$/ /;
 
-	s/ --source / -s /;
-	s/ --destination / -d /;
-	s/ --out-interface / -o /;
-	s/ --in-interface / -i /;
-	s/ --jump / -j /;
-	s/ --protocol / -p /;
-	s/ --match / -m /g;
-	s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
-	s/ -m state -p tcp / -p tcp -m state /;
-	s/ --destination-ports / --dports /;
+	$r =~ s/ --source / -s /;
+	$r =~ s/ --destination / -d /;
+	$r =~ s/ --out-interface / -o /;
+	$r =~ s/ --in-interface / -i /;
+	$r =~ s/ --jump / -j /;
+	$r =~ s/ --protocol / -p /;
+	$r =~ s/ --match / -m /g;
+	$r =~ s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
+	$r =~ s/ -m state -p tcp / -p tcp -m state /;
+	$r =~ s/ --destination-ports / --dports /;
 
-	s#-d ($ip) #-d $1/32 #;
-	s#-s ($ip) #-s $1/32 #;
+	$r =~ s#-d ($ip) #-d $1/32 #;
+	$r =~ s#-s ($ip) #-s $1/32 #;
 
-	s# --comment ([a-z0-9_-]+) # --comment "$1" #;
+	$r =~ s# --comment ([a-z0-9_-]+) # --comment "$1" #;
 
 	# FIXME this should be done for all services by looking up getent info
 	if ( m/ --dport ([a-zA-Z0-9]+) / ) {
 		my $o = $1;
-		my $r = canonicalize_service( $o );
-		s/ --dport $o / --dport $r /;
+		my $c = canonicalize_service( $o );
+		$r =~ s/ --dport $o / --dport $c /;
 	}
 	if ( m/ --dports ([a-zA-Z0-9,]+) / ) {
 		my $o = $1;
-		my $r = canonicalize_services( $o );
-		s/ --dports $o / --dports $r /;
+		my $c = canonicalize_services( $o );
+		$r =~ s/ --dports $o / --dports $c /;
 	}
 
-	s# --limit ([0-9]+)/s # --limit $1/sec #;
+	$r =~ s# --limit ([0-9]+)/s # --limit $1/sec #;
 
 	# set default values where optional and omitted
-	s/ -j REJECT\s*$/ -j REJECT --reject-with icmp-port-unreachable/;
+	$r =~ s/ -j REJECT\s*$/ -j REJECT --reject-with icmp-port-unreachable/;
 
 	# this normalizes the wrong way, but it's better readable this way
-	s/ -m icmp --icmp-type 8 / --icmp-type echo-request /;
+	$r =~ s/ -m icmp --icmp-type 8 / --icmp-type echo-request /;
 
-	s# -p (tcp|udp|icmp)(( .*)?)-m \1 # -p $1$2 #;
+	$r =~ s# -p (tcp|udp|icmp)(( .*)?)-m \1 # -p $1$2 #;
 
 	# fixup misc order stuff
-	s# -j SNAT (.*) --to-source # $1 -j SNAT --to-source #;
-	s# -o ($dev) -d ($ip) # -d $2 -o $1 #;
-	s# -i ($dev) -s ($net) -d ($net) # -s $2 -d $3 -i $1 #;
-	s# -i ($dev)(( .*)?) -s ($net) # -s $4 -i $1$2 #;
-	s# -p (tcp|udp|icmp) --dport ($port)(( -s $net)?( -d $net)?) #$3 -p $1 --dport $2 #;
-	s# -i ($dev) -p (tcp|udp) -d ($net) # -d $3 -i $1 -p $2 #;
-	s# -p (tcp|udp|icmp) -s ($net) -d ($net) # -s $2 -d $3 -p $1 #;
-	s# -p (tcp|udp|icmp) -d ($net) # -d $2 -p $1 #;
-	s# -p (tcp|udp|icmp) -s ($net) -i ($dev) -o ($dev) # -s $2 -i $3 -o $4 -p $1 #;
-	s# -i ($dev) -o ($dev) -d ($net) # -d $3 -i $1 -o $2 #;
+	$r =~ s# -j SNAT (.*) --to-source # $1 -j SNAT --to-source #;
+	$r =~ s# -o ($dev) -d ($ip) # -d $2 -o $1 #;
+	$r =~ s# -i ($dev) -s ($net) -d ($net) # -s $2 -d $3 -i $1 #;
+	$r =~ s# -i ($dev)(( .*)?) -s ($net) # -s $4 -i $1$2 #;
+	$r =~ s# -p (tcp|udp|icmp) --dport ($port)(( -s $net)?( -d $net)?) #$3 -p $1 --dport $2 #;
+	$r =~ s# -i ($dev) -p (tcp|udp) -d ($net) # -d $3 -i $1 -p $2 #;
+	$r =~ s# -p (tcp|udp|icmp) -s ($net) -d ($net) # -s $2 -d $3 -p $1 #;
+	$r =~ s# -p (tcp|udp|icmp) -d ($net) # -d $2 -p $1 #;
+	$r =~ s# -p (tcp|udp|icmp) -s ($net) -i ($dev) -o ($dev) # -s $2 -i $3 -o $4 -p $1 #;
+	$r =~ s# -i ($dev) -o ($dev) -d ($net) # -d $3 -i $1 -o $2 #;
 
-	s# -o ($dev) -d ($net) # -d $2 -o $1 #;
-	s# -i ($dev) -d ($net) # -d $2 -i $1 #;
-	s# --dport ($port) --sport ($port) # --sport $2 --dport $1 #;
-	s# -p (tcp|udp|icmp) --dport ($port) -o ($dev) # -o $3 -p $1 --dport $2 #;
-	s# -d ($net) -p (tcp|udp) --dport ($port) -s ($net) # -s $4 -d $1 -p $2 --dport $3 #;
+	$r =~ s# -o ($dev) -d ($net) # -d $2 -o $1 #;
+	$r =~ s# -i ($dev) -d ($net) # -d $2 -i $1 #;
+	$r =~ s# --dport ($port) --sport ($port) # --sport $2 --dport $1 #;
+	$r =~ s# -p (tcp|udp|icmp) --dport ($port) -o ($dev) # -o $3 -p $1 --dport $2 #;
+	$r =~ s# -d ($net) -p (tcp|udp) --dport ($port) -s ($net) # -s $4 -d $1 -p $2 --dport $3 #;
 
 
-	s# -p (tcp|udp) -s ($net) # -s $2 -p $1 #;
-    s# -p (tcp|udp) -m state # -m state -p $1 #;
+	$r =~ s# -p (tcp|udp) -s ($net) # -s $2 -p $1 #;
 
-    s# -s 0/0 # #;
-    s# -d 0/0 # #;
+	$r =~ s# -s 0/0 # #;
+	$r =~ s# -d 0/0 # #;
 
-	s#  +# #;
-	s# +$##;
+	$r =~ s#  +# #;
+	$r =~ s# +$##;
 
-	return $_;
+	return $r;
 }
 
 sub parse_ruleset {
