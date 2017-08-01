@@ -32,6 +32,7 @@ use strict;
 use warnings;
 use YAML::Syck;
 use Algorithm::Diff;
+use v5.10;
 
 # this is a list of iptables rules which are omitted by iptables-save if
 # they're unchanged because they're probably not even loaded
@@ -69,6 +70,7 @@ sub canonicalize_service {
 		imaps => 993,
 		pop3s => 995,
 		nrpe => 5666,
+		git => 9418,
 	};
 
 	return $SERVICE->{$service} if defined $SERVICE->{$service};
@@ -84,7 +86,7 @@ sub canonicalize_services {
 }
 
 sub normalize_iptablesrule {
-	my $r = shift;
+	my $rule = shift;
 
 	# regex snippets
 	my $dev = '[a-z0-9_]+';
@@ -92,74 +94,105 @@ sub normalize_iptablesrule {
 	my $net = $ip.'/[0-9]+';
 	my $port = '[0-9]+|[0-9]+:[0-9]+';
 
-	$r =~ s/$/ /;
+	$rule =~ s/^/ /;
+	$rule =~ s/$/ /;
 
-	$r =~ s/ --source / -s /;
-	$r =~ s/ --destination / -d /;
-	$r =~ s/ --out-interface / -o /;
-	$r =~ s/ --in-interface / -i /;
-	$r =~ s/ --jump / -j /;
-	$r =~ s/ --protocol / -p /;
-	$r =~ s/ --match / -m /g;
-	$r =~ s# --state ESTABLISHED,RELATED # --state RELATED,ESTABLISHED #;
-	$r =~ s/ -m state -p tcp / -p tcp -m state /;
-	$r =~ s/ --destination-ports / --dports /;
+	# shorten a few commands
+	$rule =~ s/ --source / -s /;
+	$rule =~ s/ --destination / -d /;
+	$rule =~ s/ --out-interface / -o /;
+	$rule =~ s/ --in-interface / -i /;
+	$rule =~ s/ --jump / -j /;
+	$rule =~ s/ --protocol / -p /;
+	$rule =~ s/ --match / -m /g;
+	$rule =~ s/ --destination-ports / --dports /;
 
-	$r =~ s#-d ($ip) #-d $1/32 #;
-	$r =~ s#-s ($ip) #-s $1/32 #;
+	# bring into normalized order
+	$rule =~ s# --state RELATED,ESTABLISHED # --state ESTABLISHED,RELATED #;
 
-	$r =~ s# --comment ([a-z0-9_-]+) # --comment "$1" #;
+	# normalize single IP addresses to addr/net form
+	$rule =~ s#-d ($ip) #-d $1/32 #;
+	$rule =~ s#-s ($ip) #-s $1/32 #;
+
+	# always quote arguments
+	$rule =~ s# --comment ([a-z0-9_-]+) # --comment "$1" #;
 
 	# FIXME this should be done for all services by looking up getent info
-	if ( m/ --dport ([a-zA-Z0-9]+) / ) {
-		my $o = $1;
-		my $c = canonicalize_service( $o );
-		$r =~ s/ --dport $o / --dport $c /;
-	}
-	if ( m/ --dports ([a-zA-Z0-9,]+) / ) {
-		my $o = $1;
-		my $c = canonicalize_services( $o );
-		$r =~ s/ --dports $o / --dports $c /;
-	}
+	$rule =~ s/ --dport ssh / --dport 22 /;
+	$rule =~ s/ --dport smtp / --dport 25 /;
+	$rule =~ s/ --dport domain / --dport 53 /;
+	$rule =~ s/ --dport http / --dport 80 /;
+	$rule =~ s/ --dport pop3 / --dport 110 /;
+	$rule =~ s/ --dport imap2 / --dport 143 /;
+	$rule =~ s/ --dport https / --dport 443 /;
+	$rule =~ s/ --dport imaps / --dport 993 /;
+	$rule =~ s/ --dport pop3s / --dport 995 /;
+	$rule =~ s/ --dport nrpe / --dport 5666 /;
+	$rule =~ s/ --dport git / --dport 9418 /;
 
-	$r =~ s# --limit ([0-9]+)/s # --limit $1/sec #;
+	$rule =~ s# --limit ([0-9]+)/s # --limit $1/sec #;
 
 	# set default values where optional and omitted
-	$r =~ s/ -j REJECT\s*$/ -j REJECT --reject-with icmp-port-unreachable/;
+	$rule =~ s/ -j REJECT\s*$/ -j REJECT --reject-with icmp-port-unreachable/;
 
 	# this normalizes the wrong way, but it's better readable this way
-	$r =~ s/ -m icmp --icmp-type 8 / --icmp-type echo-request /;
+	$rule =~ s/ -m icmp --icmp-type 8 / --icmp-type echo-request /;
 
-	$r =~ s# -p (tcp|udp|icmp)(( .*)?)-m \1 # -p $1$2 #;
+	# don't explicitly use -m (tcp|udp|icmp) module when limiting to that protocol
+	$rule =~ s# -p (tcp|udp|icmp)(( .*)?)-m \1 # -p $1$2 #;
 
-	# fixup misc order stuff
-	$r =~ s# -j SNAT (.*) --to-source # $1 -j SNAT --to-source #;
-	$r =~ s# -o ($dev) -d ($ip) # -d $2 -o $1 #;
-	$r =~ s# -i ($dev) -s ($net) -d ($net) # -s $2 -d $3 -i $1 #;
-	$r =~ s# -i ($dev)(( .*)?) -s ($net) # -s $4 -i $1$2 #;
-	$r =~ s# -p (tcp|udp|icmp) --dport ($port)(( -s $net)?( -d $net)?) #$3 -p $1 --dport $2 #;
-	$r =~ s# -i ($dev) -p (tcp|udp) -d ($net) # -d $3 -i $1 -p $2 #;
-	$r =~ s# -p (tcp|udp|icmp) -s ($net) -d ($net) # -s $2 -d $3 -p $1 #;
-	$r =~ s# -p (tcp|udp|icmp) -d ($net) # -d $2 -p $1 #;
-	$r =~ s# -p (tcp|udp|icmp) -s ($net) -i ($dev) -o ($dev) # -s $2 -i $3 -o $4 -p $1 #;
-	$r =~ s# -i ($dev) -o ($dev) -d ($net) # -d $3 -i $1 -o $2 #;
+	# parse out some stuff and put it back together again
+	my $chain;
+	if ( $rule =~ s/ -A ([a-zA-Z0-9_-]+) / / ) {
+		$chain = " -A $1 ";
+	}
 
-	$r =~ s# -o ($dev) -d ($net) # -d $2 -o $1 #;
-	$r =~ s# -i ($dev) -d ($net) # -d $2 -i $1 #;
-	$r =~ s# --dport ($port) --sport ($port) # --sport $2 --dport $1 #;
-	$r =~ s# -p (tcp|udp|icmp) --dport ($port) -o ($dev) # -o $3 -p $1 --dport $2 #;
-	$r =~ s# -d ($net) -p (tcp|udp) --dport ($port) -s ($net) # -s $4 -d $1 -p $2 --dport $3 #;
+	my $interface;
+	if ( $rule =~ s/ -i ($dev) / / ) {
+		$interface = " -i $1 ";
+	}
 
+	my $outerface;
+	if ( $rule =~ s/ -o ($dev) / / ) {
+		$outerface = " -o $1 ";
+	}
 
-	$r =~ s# -p (tcp|udp) -s ($net) # -s $2 -p $1 #;
+	my $source;
+	if ( $rule =~ s/ ((\! )?-s ($net)) / / ) {
+		$source = " $1 ";
+	}
 
-	$r =~ s# -s 0/0 # #;
-	$r =~ s# -d 0/0 # #;
+	my $dest;
+	if ( $rule =~ s/ ((\! )?-d ($net)) / / ) {
+		$dest = " $1 ";
+	}
 
-	$r =~ s#  +# #;
-	$r =~ s# +$##;
+	my $sport;
+	if ( $rule =~ s/ (--sport ($port)) / / ) {
+		$sport = " $1 ";
+	}
 
-	return $r;
+	my $dport;
+	if ( $rule =~ s/ (--dport ($port)) / / ) {
+		$dport = " $1 ";
+	}
+
+	$rule = ( $chain // "" )
+	      . ( $interface // "" )
+	      . ( $outerface // "" )
+	      . ( $source // "" )
+	      . ( $dest // "" )
+	      . ( $sport // "" )
+	      . ( $dport // "" )
+	      . ( $rule );
+
+#	say "debug: $rule";
+
+	$rule =~ s#  +# #g;
+	$rule =~ s# $##;
+	$rule =~ s#^ ##;
+
+	return $rule;
 }
 
 sub parse_ruleset {
@@ -203,7 +236,7 @@ sub parse_ruleset {
 			push @{$ruleset->{$table}->{$chain}->{rules}}, $rule;
 			next;
 		}
-		print STDERR "ignored: $_";
+		print STDERR "ignored: $_\n";
 	}
 	return $ruleset;
 }

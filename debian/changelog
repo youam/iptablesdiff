@@ -1,3 +1,9 @@
+iptablesdiff (0.16) stable; urgency=medium
+
+  * Rewrite reordering
+
+ -- Uli Martens <uli@youam.net>  Sun, 16 Jul 2017 16:45:02 +0200
+
 iptablesdiff (0.15) stable; urgency=medium
 
   * normalize service names (static table for now)

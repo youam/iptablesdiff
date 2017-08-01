@@ -1,0 +1,21 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Net::servent;
+
+sub human2port {
+	my $in = shift;
+
+	my $ent = getservbyname( $in )
+		or return $in;
+
+	return $ent->port;
+}
+
+
+my $in = shift || 'ssh';
+
+
+print human2port( $in );
